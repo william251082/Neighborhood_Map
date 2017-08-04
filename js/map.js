@@ -3,6 +3,9 @@ var map;
       // Create a new blank array for all the listing markers.
       var markers = [];
 
+      // This global polygon variable is to ensure only ONE polygon is rendered.
+      var polygon = null;
+
       function initMap() {
          // Create a styles array to use with the map.
         var styles = [
@@ -107,6 +110,18 @@ var map;
 
         var largeInfowindow = new google.maps.InfoWindow();
 
+        // Initialize the drawing manager.
+        var drawingManager = new google.maps.drawing.DrawingManager({
+          drawingMode: google.maps.drawing.OverlayType.POLYGON,
+          drawingControl: true,
+          drawingControlOptions: {
+            position: google.maps.ControlPosition.TOP_LEFT,
+            drawingModes: [
+              google.maps.drawing.OverlayType.POLYGON
+            ]
+          }
+        });
+
         // Style the markers a bit. This will be our listing marker icon.
         var defaultIcon = makeMarkerIcon('0091ff');
 
@@ -114,7 +129,6 @@ var map;
         // mouses over the marker.
         var highlightedIcon = makeMarkerIcon('FFFF24');
 
-        var largeInfowindow = new google.maps.InfoWindow();
 
         // The following group uses the location array to create an array of markers on initialize.
         for (var i = 0; i < locations.length; i++) {
@@ -144,10 +158,40 @@ var map;
           marker.addListener('mouseout', function() {
             this.setIcon(defaultIcon);
           });
-        }
-         document.getElementById('show-listings').addEventListener('click', showListings);
+    }
+
+        document.getElementById('show-listings').addEventListener('click', showListings);
         document.getElementById('hide-listings').addEventListener('click', hideListings);
+        document.getElementById('toggle-drawing').addEventListener('click', function() {
+          toggleDrawing(drawingManager);
+        });
+        document.getElementById('zoom-to-area').addEventListener('click', function() {
+          zoomToArea();
+        });
+
+        // Add an event listener so that the polygon is captured,  call the
+        // searchWithinPolygon function. This will show the markers in the polygon,
+        // and hide any outside of it.
+        drawingManager.addListener('overlaycomplete', function(event) {
+          // First, check if there is an existing polygon.
+          // If there is, get rid of it and remove the markers
+          if (polygon) {
+            polygon.setMap(null);
+            hideListings(markers);
+          }
+          // Switching the drawing mode to the HAND (i.e., no longer drawing).
+          drawingManager.setDrawingMode(null);
+          // Creating a new editable polygon from the overlay.
+          polygon = event.overlay;
+          polygon.setEditable(true);
+          // Searching within the polygon.
+          searchWithinPolygon();
+          // Make sure the search is re-done if the poly is changed.
+          polygon.getPath().addListener('set_at', searchWithinPolygon);
+          polygon.getPath().addListener('insert_at', searchWithinPolygon);
+        });
       }
+
       // This function populates the infowindow when the marker is clicked. We'll only allow
       // one infowindow which will open at the marker that is clicked, and populate based
       // on that markers position.
@@ -221,4 +265,59 @@ var map;
           new google.maps.Point(10, 34),
           new google.maps.Size(21,34));
         return markerImage;
+      }
+
+
+      // This shows and hides (respectively) the drawing options.
+      function toggleDrawing(drawingManager) {
+        if (drawingManager.map) {
+          drawingManager.setMap(null);
+          // In case the user drew anything, get rid of the polygon
+          if (polygon !== null) {
+            polygon.setMap(null);
+          }
+        } else {
+          drawingManager.setMap(map);
+        }
+      }
+      // This function hides all markers outside the polygon,
+      // and shows only the ones within it. This is so that the
+      // user can specify an exact area of search.
+      function searchWithinPolygon() {
+        for (var i = 0; i < markers.length; i++) {
+          if (google.maps.geometry.poly.containsLocation(markers[i].position, polygon)) {
+            markers[i].setMap(map);
+          } else {
+            markers[i].setMap(null);
+          }
+        }
+      }
+
+      // This function takes the input value in the find nearby area text input
+      // locates it, and then zooms into that area. This is so that the user can
+      // show all listings, then decide to focus on one area of the map.
+      function zoomToArea() {
+        // Initialize the geocoder.
+        var geocoder = new google.maps.Geocoder();
+        // Get the address or place that the user entered.
+        var address = document.getElementById('zoom-to-area-text').value;
+        // Make sure the address isn't blank.
+        if (address == '') {
+          window.alert('You must enter an area, or address.');
+        } else {
+          // Geocode the address/area entered to get the center. Then, center the map
+          // on it and zoom in
+          geocoder.geocode(
+            { address: address,
+              componentRestrictions: {locality: 'New York'}
+            }, function(results, status) {
+              if (status == google.maps.GeocoderStatus.OK) {
+                map.setCenter(results[0].geometry.location);
+                map.setZoom(15);
+              } else {
+                window.alert('We could not find that location - try entering a more' +
+                    ' specific place.');
+              }
+            });
+        }
       }

@@ -53,6 +53,10 @@ html,
         height: 200px;
       }
 
+      #search-within-time-text {
+        width: 84%;
+      }
+
       .text {
         font-size: 12px;
       }
@@ -67,7 +71,7 @@ html,
         position: relative;
         width: 70%;
       }
-      
+
       #zoom-to-area {
         width: 24%;
       }

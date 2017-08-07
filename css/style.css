@@ -53,6 +53,7 @@ html,
         height: 200px;
       }
 
+      #places-search,
       #search-within-time-text {
         width: 84%;
       }
